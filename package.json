@@ -1,0 +1,79 @@
+{
+  "name": "weightlift",
+  "version": "0.1.0",
+  "description": "In-browser ML model manager with download progress.",
+  "license": "MIT",
+  "author": {
+    "name": "wassgha",
+    "email": "wassgha@gmail.com"
+  },
+  "homepage": "https://github.com/wassgha/weightlift#readme",
+  "bugs": {
+    "url": "https://github.com/wassgha/weightlift/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wassgha/weightlift.git"
+  },
+  "keywords": [
+    "ml",
+    "model-manager",
+    "onnx",
+    "progress",
+    "model-loading",
+    "web-worker",
+    "transformers.js",
+    "clip",
+    "whisper"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "default": "./dist/react.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "tsx --test tests/**/*-test.ts",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "react": "^19.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5"
+  }
+}
