@@ -1,10 +1,38 @@
 # weightlift
 
-In-browser AI/ML multi-model manager with download progress.
+**Build local, on-device AI experiences in the browser — faster.**
+
+Weightlift is a small TypeScript library that handles the hard parts of shipping
+in-browser ML: downloading models with real progress, detecting cache hits,
+deduping concurrent loads, WebGPU/WASM fallbacks, and clean unload. Point it at
+Transformers.js, ONNX, WebLLM, or any custom loader and focus on the product.
 
 [**Try the playground →**](https://weightlift.dev)
 
 [![weightlift playground](./assets/demo.png)](https://weightlift.dev)
+
+## At a glance
+
+| You get | So you can |
+| --- | --- |
+| Named multi-model registry | Load, preload, and unload models from one place |
+| Download + cache progress | Show “Downloading… 42%” or “Loading from cache…” |
+| Concurrent-load deduping | Call `load()` from several places safely |
+| `transformersModel` helper | Wire Transformers.js with WebGPU → WASM fallback |
+| React hooks | Bind loading UI with `useModel` |
+| Worker progress bridge | Keep heavy inference off the main thread |
+
+Runtime-agnostic: Whisper, CLIP, SigLIP, custom ONNX — anything that resolves a
+promise and optionally reports byte progress.
+
+## Powered by weightlift
+
+[**rescript**](https://github.com/wassgha/rescript) — open-source, transcript-based
+video/audio editor. Drop in a file; Whisper transcription and speaker labels run
+fully on-device in the browser. Weightlift manages model download, cache, and
+progress for that local AI pipeline.
+
+[Try rescript →](https://wassgha.github.io/rescript/) · [GitHub →](https://github.com/wassgha/rescript)
 
 ## Install
 
