@@ -1,8 +1,10 @@
 # weightlift
 
-In-browser ML model registry with download progress.
+In-browser AI/ML multi-model manager with download progress.
 
 [**Try the playground →**](https://weightlift.dev)
+
+[![weightlift playground](./assets/demo.png)](https://weightlift.dev)
 
 ## Install
 
