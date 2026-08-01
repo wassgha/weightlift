@@ -1,5 +1,5 @@
 /**
- * weightlift — in-browser ML model manager with download progress.
+ * weightlift — in-browser ML model registry with download progress.
  *
  * @packageDocumentation
  *
@@ -9,20 +9,15 @@
  * ```ts
  * import { ModelManager } from "weightlift";
  *
- * const models = new ModelManager();
- * models.define("siglip", {
- *   load: async ({ progress }) => {
- *     return pipeline("zero-shot-image-classification", modelId, {
- *       progress_callback: (p) => {
- *         if (p.status === "progress_total" && p.total) {
- *           progress.dispatch({
- *             type: "progress_total",
- *             loaded: ((p.progress ?? 0) / 100) * p.total,
- *             total: p.total,
- *           });
- *         }
- *       },
- *     });
+ * import { transformersModel } from "weightlift/transformers";
+ *
+ * const models = new ModelManager({
+ *   models: {
+ *     siglip: transformersModel({
+ *       pipeline,
+ *       task: "zero-shot-image-classification",
+ *       modelId,
+ *     }),
  *   },
  * });
  *
@@ -34,6 +29,8 @@ export {
   ModelManager,
   type LoadContext,
   type ModelDefinition,
+  type ModelRegistryMap,
+  type ModelManagerOptions,
   type ModelRecord,
   type ManagerSnapshot,
   type ManagerListener,

@@ -14,11 +14,16 @@ function deferred<T>() {
 }
 
 describe("ModelManager", () => {
-  it("define + load returns the model and marks ready", async () => {
-    const models = new ModelManager();
-    models.define("clip", {
-      load: async () => ({ name: "clip" }),
+  it("registers models in the constructor and loads by id", async () => {
+    const models = new ModelManager({
+      models: {
+        clip: {
+          load: async () => ({ name: "clip" }),
+        },
+      },
     });
+    assert.equal(models.has("clip"), true);
+    assert.deepEqual(models.ids(), ["clip"]);
     const value = await models.load<{ name: string }>("clip");
     assert.deepEqual(value, { name: "clip" });
     assert.equal(models.isReady("clip"), true);
@@ -26,15 +31,27 @@ describe("ModelManager", () => {
     assert.equal(models.status("clip").status, "ready");
   });
 
+  it("define adds models after init", async () => {
+    const models = new ModelManager();
+    models.define("clip", {
+      load: async () => ({ name: "clip" }),
+    });
+    const value = await models.load<{ name: string }>("clip");
+    assert.deepEqual(value, { name: "clip" });
+  });
+
   it("dedupes concurrent load() calls", async () => {
     let calls = 0;
     const gate = deferred<void>();
-    const models = new ModelManager();
-    models.define("m", {
-      load: async () => {
-        calls += 1;
-        await gate.promise;
-        return "ok";
+    const models = new ModelManager({
+      models: {
+        m: {
+          load: async () => {
+            calls += 1;
+            await gate.promise;
+            return "ok";
+          },
+        },
       },
     });
     const p1 = models.load("m");
@@ -46,36 +63,67 @@ describe("ModelManager", () => {
     assert.equal(calls, 1);
   });
 
-  it("load(id, definition) registers lazily", async () => {
-    const models = new ModelManager();
-    const value = await models.load("lazy", {
-      load: async () => 42,
+  it("remove drops the definition; unload keeps it", async () => {
+    const models = new ModelManager({
+      models: {
+        x: {
+          load: async () => "v",
+        },
+      },
     });
-    assert.equal(value, 42);
-    assert.equal(models.has("lazy"), true);
+    await models.load("x");
+    await models.unload("x");
+    assert.equal(models.has("x"), true);
+    assert.equal(models.isReady("x"), false);
+    assert.equal(await models.load("x"), "v");
+
+    await models.remove("x");
+    assert.equal(models.has("x"), false);
+    await assert.rejects(() => models.load("x"), /unknown model/);
   });
 
   it("exposes fromCache without owning UI copy", async () => {
-    const models = new ModelManager();
-    await models.load("w", {
-      isCached: async () => true,
-      load: async () => "x",
+    const models = new ModelManager({
+      models: {
+        w: {
+          isCached: async () => true,
+          load: async () => "x",
+        },
+      },
     });
+    await models.load("w");
     assert.equal(models.status("w").fromCache, true);
 
-    const models2 = new ModelManager();
-    await models2.load("w", {
-      isCached: async () => false,
-      load: async () => "x",
+    const models2 = new ModelManager({
+      models: {
+        w: {
+          isCached: async () => false,
+          load: async () => "x",
+        },
+      },
     });
+    await models2.load("w");
     assert.equal(models2.status("w").fromCache, false);
   });
 
   it("exposes progress through the load context", async () => {
-    const models = new ModelManager();
+    const models = new ModelManager({
+      models: {
+        p: {
+          load: async (ctx) => {
+            ctx.progress.dispatch({
+              type: "progress_total",
+              loaded: 25,
+              total: 100,
+            });
+            return "model";
+          },
+        },
+      },
+    });
     let progress: Weightlift | undefined;
     const gate = deferred<void>();
-    const done = models.load("p", {
+    models.define("p2", {
       load: async (ctx) => {
         progress = ctx.progress;
         ctx.progress.dispatch({
@@ -87,23 +135,27 @@ describe("ModelManager", () => {
         return "model";
       },
     });
+    const done = models.load("p2");
     await Promise.resolve();
     await Promise.resolve();
     assert.ok(progress);
-    assert.equal(models.status("p").percent, 0.25);
-    assert.equal(models.getSnapshot().loading.includes("p"), true);
+    assert.equal(models.status("p2").percent, 0.25);
+    assert.equal(models.getSnapshot().loading.includes("p2"), true);
     gate.resolve();
     await done;
-    assert.equal(models.getSnapshot().ready.includes("p"), true);
+    assert.equal(models.getSnapshot().ready.includes("p2"), true);
   });
 
   it("unload clears the instance so load runs again", async () => {
     let calls = 0;
-    const models = new ModelManager();
-    models.define("x", {
-      load: async () => {
-        calls += 1;
-        return calls;
+    const models = new ModelManager({
+      models: {
+        x: {
+          load: async () => {
+            calls += 1;
+            return calls;
+          },
+        },
       },
     });
     assert.equal(await models.load("x"), 1);
@@ -113,13 +165,31 @@ describe("ModelManager", () => {
     assert.equal(await models.load("x"), 2);
   });
 
+  it("unloadAll drops every cached instance", async () => {
+    const models = new ModelManager({
+      models: {
+        a: { load: async () => "a" },
+        b: { load: async () => "b" },
+      },
+    });
+    await models.preload(["a", "b"]);
+    await models.unloadAll();
+    assert.equal(models.isReady("a"), false);
+    assert.equal(models.isReady("b"), false);
+    assert.equal(models.has("a"), true);
+    assert.equal(models.has("b"), true);
+  });
+
   it("calls dispose on unload", async () => {
     let disposed: string | null = null;
-    const models = new ModelManager();
-    models.define("gpu", {
-      load: async () => "session",
-      dispose: async (v) => {
-        disposed = v;
+    const models = new ModelManager({
+      models: {
+        gpu: {
+          load: async () => "session",
+          dispose: async (v) => {
+            disposed = v;
+          },
+        },
       },
     });
     await models.load("gpu");
@@ -129,12 +199,15 @@ describe("ModelManager", () => {
 
   it("retries after failure", async () => {
     let calls = 0;
-    const models = new ModelManager();
-    models.define("flaky", {
-      load: async () => {
-        calls += 1;
-        if (calls === 1) throw new Error("nope");
-        return "ok";
+    const models = new ModelManager({
+      models: {
+        flaky: {
+          load: async () => {
+            calls += 1;
+            if (calls === 1) throw new Error("nope");
+            return "ok";
+          },
+        },
       },
     });
     await assert.rejects(() => models.load("flaky"));
@@ -144,9 +217,12 @@ describe("ModelManager", () => {
   });
 
   it("preload loads many ids", async () => {
-    const models = new ModelManager();
-    models.define("a", { load: async () => "a" });
-    models.define("b", { load: async () => "b" });
+    const models = new ModelManager({
+      models: {
+        a: { load: async () => "a" },
+        b: { load: async () => "b" },
+      },
+    });
     await models.preload(["a", "b"]);
     assert.deepEqual(models.getSnapshot().ready.sort(), ["a", "b"]);
   });

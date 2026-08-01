@@ -1,7 +1,7 @@
 {
   "name": "weightlift",
-  "version": "0.1.0",
-  "description": "In-browser ML model manager with download progress.",
+  "version": "0.2.0",
+  "description": "In-browser ML model registry with download progress.",
   "license": "MIT",
   "author": {
     "name": "wassgha",
@@ -45,6 +45,11 @@
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js",
       "default": "./dist/worker.js"
+    },
+    "./transformers": {
+      "types": "./dist/transformers.d.ts",
+      "import": "./dist/transformers.js",
+      "default": "./dist/transformers.js"
     },
     "./package.json": "./package.json"
   },

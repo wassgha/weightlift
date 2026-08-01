@@ -5,6 +5,7 @@ import {
   ModelManager,
   idleRecord,
   type ManagerSnapshot,
+  type ModelManagerOptions,
   type ModelRecord,
 } from "./manager.js";
 import { Weightlift } from "./store.js";
@@ -19,6 +20,8 @@ export type {
   ModelRecord,
   ManagerSnapshot,
   ModelDefinition,
+  ModelRegistryMap,
+  ModelManagerOptions,
   LoadContext,
 } from "./manager.js";
 export {
@@ -73,9 +76,12 @@ export function useModel<T = unknown>(
   };
 }
 
-/** Stable {@link ModelManager} for the lifetime of the component. */
-export function useModelManagerStore(): ModelManager {
-  return useMemo(() => new ModelManager(), []);
+/**
+ * Stable {@link ModelManager} for the lifetime of the component.
+ * `options` are read once on mount (seed the registry there).
+ */
+export function useModelManagerStore(options?: ModelManagerOptions): ModelManager {
+  return useMemo(() => new ModelManager(options), []);
 }
 
 /** Low-level progress store subscription. Prefer {@link useModel}. */

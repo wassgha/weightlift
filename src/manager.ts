@@ -33,6 +33,15 @@ export interface ModelDefinition<T = unknown> {
   dispose?: (value: T) => void | Promise<void>;
 }
 
+/** Initial registry passed to {@link ModelManager}'s constructor. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ModelRegistryMap = Record<string, ModelDefinition<any>>;
+
+export interface ModelManagerOptions {
+  /** Models to register up front. Prefer this over defining at `load()` time. */
+  models?: ModelRegistryMap;
+}
+
 /** UI-facing per-model record (no heavyweight model handle). */
 export interface ModelRecord {
   id: string;
@@ -123,22 +132,25 @@ const EMPTY_SNAPSHOT: ManagerSnapshot = {
 };
 
 /**
- * In-browser ML **model manager**: define loaders once, then
- * `load` / `get` / `unload` by id with shared progress state.
+ * In-browser ML **model registry**: register loaders up front (or via
+ * {@link ModelManager.define} / {@link ModelManager.remove}), then
+ * `load` / `get` / `unload` by id.
  *
  * Runtime-agnostic — `T` can be a Whisper pipeline, CLIP/SigLIP encoder,
  * WebLLM engine, or any other handle. weightlift only owns lifecycle + bytes.
  *
  * ```ts
- * const models = new ModelManager();
- *
- * models.define("siglip", {
- *   load: async ({ progress }) =>
- *     pipeline("zero-shot-image-classification", modelId, {
- *       progress_callback: (p) => {
- *         // map runtime events → progress.dispatch(...)
- *       },
- *     }),
+ * const models = new ModelManager({
+ *   models: {
+ *     siglip: {
+ *       load: async ({ progress }) =>
+ *         pipeline("zero-shot-image-classification", modelId, {
+ *           progress_callback: (p) => {
+ *             // map runtime events → progress.dispatch(...)
+ *           },
+ *         }),
+ *     },
+ *   },
  * });
  *
  * const clip = await models.load("siglip");
@@ -148,6 +160,14 @@ export class ModelManager {
   #entries = new Map<string, Entry>();
   #listeners = new Set<ManagerListener>();
   #snapshot: ManagerSnapshot = EMPTY_SNAPSHOT;
+
+  constructor(options?: ModelManagerOptions) {
+    if (options?.models) {
+      for (const [id, definition] of Object.entries(options.models)) {
+        this.define(id, definition);
+      }
+    }
+  }
 
   /** Register (or replace) how a model id is loaded. */
   define<T>(id: string, definition: ModelDefinition<T>): this {
@@ -178,19 +198,38 @@ export class ModelManager {
   }
 
   /**
-   * Load a model by id. Concurrent callers share one promise.
-   * Pass `definition` to define-and-load in one shot (lazy registration).
+   * Remove a model from the registry (disposes a ready instance if any).
+   * Different from {@link unload}, which keeps the definition for a later load.
    */
-  load<T>(id: string, definition?: ModelDefinition<T>): Promise<T> {
-    if (definition) {
-      const existing = this.#entries.get(id);
-      if (!existing) this.define(id, definition);
+  async remove(id: string): Promise<void> {
+    const entry = this.#entries.get(id);
+    if (!entry) return;
+    if (entry.promise && entry.progress.isLoading) {
+      throw new Error(
+        `weightlift: cannot remove "${id}" while a load is in flight`
+      );
     }
+    entry.unsubProgress();
+    await this.#disposeEntry(entry);
+    this.#entries.delete(id);
+    this.#emit();
+  }
+
+  /** Registered model ids. */
+  ids(): string[] {
+    return [...this.#entries.keys()];
+  }
+
+  /**
+   * Load a registered model by id. Concurrent callers share one promise.
+   * The model must already be in the registry (`define` or constructor).
+   */
+  load<T = unknown>(id: string): Promise<T> {
     const entry = this.#entries.get(id) as Entry<T> | undefined;
     if (!entry) {
       return Promise.reject(
         new Error(
-          `weightlift: unknown model "${id}". Call define() or pass a definition to load().`
+          `weightlift: unknown model "${id}". Register it in the constructor or via define().`
         )
       );
     }
@@ -272,7 +311,7 @@ export class ModelManager {
 
   /**
    * Drop a cached instance (and call `dispose` if provided) so the next
-   * `load()` runs the definition again. Useful after a WebGPU device loss.
+   * `load()` runs the definition again. Keeps the model in the registry.
    */
   async unload(id: string): Promise<void> {
     const entry = this.#entries.get(id);
@@ -285,7 +324,12 @@ export class ModelManager {
     this.#emit();
   }
 
-  /** Unload every model and clear definitions. */
+  /** Unload every cached instance; definitions stay registered. */
+  async unloadAll(): Promise<void> {
+    await Promise.all(this.ids().map((id) => this.unload(id)));
+  }
+
+  /** Unload and remove every model from the registry. */
   async clear(): Promise<void> {
     const ids = [...this.#entries.keys()];
     for (const id of ids) {
@@ -298,7 +342,7 @@ export class ModelManager {
     this.#emit();
   }
 
-  /** Warm multiple models (settles when all have finished or failed). */
+  /** Warm multiple registered models (settles when all have finished or failed). */
   async preload(ids: string[]): Promise<void> {
     await Promise.all(ids.map((id) => this.load(id)));
   }
