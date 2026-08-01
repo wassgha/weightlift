@@ -820,6 +820,43 @@ export function App() {
             codeFirst={i % 2 === 1}
           />
         ))}
+
+        <section className="featured" id="featured">
+          <p className="eyebrow">FEATURED PROJECTS</p>
+          <h2 className="featured-title">Built with weightlift</h2>
+          <p className="lede featured-lede">
+            These projects use <code>weightlift</code> to power their on-device
+            AI experiences.
+          </p>
+
+          <a
+            className="featured-project"
+            href="https://github.com/wassgha/rescript"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <div className="featured-copy">
+              <p className="featured-index">01</p>
+              <h3>Rescript – Video Editor</h3>
+              <p>
+                A transcript-based video editor that runs Whisper fully
+                on-device in the browser.
+              </p>
+              <span className="featured-link">
+                github.com/wassgha/rescript
+                <span aria-hidden="true"> →</span>
+              </span>
+            </div>
+            <div className="featured-media">
+              <img
+                src="/rescript-2.png"
+                alt="rescript — transcript-based video editor"
+                width={1600}
+                height={900}
+              />
+            </div>
+          </a>
+        </section>
       </main>
 
       <footer className="footer">
