@@ -397,7 +397,8 @@ textarea {
   color: var(--dim);
 }
 
-.code pre {
+.code pre,
+.code .code-pre {
   margin: 0;
   padding: 0.85rem 0.7rem 1.05rem;
   overflow-x: auto;
@@ -405,12 +406,45 @@ textarea {
   font-size: 0.72rem;
   line-height: 1.55;
   background: transparent !important;
+  color: #d6deeb;
 }
 
 .code code {
   display: block;
   font-family: inherit;
   font-size: inherit;
+  color: inherit;
+}
+
+/* Fallback token colors if inline theme styles are dropped */
+.code .token.comment,
+.code .token.prolog {
+  color: #637777;
+}
+.code .token.string,
+.code .token.attr-value {
+  color: #addb67;
+}
+.code .token.keyword,
+.code .token.boolean,
+.code .token.operator {
+  color: #c792ea;
+}
+.code .token.function,
+.code .token.class-name {
+  color: #82aaff;
+}
+.code .token.number,
+.code .token.constant,
+.code .token.builtin {
+  color: #f78c6c;
+}
+.code .token.punctuation {
+  color: #c792ea;
+}
+.code .token.property,
+.code .token.attr-name {
+  color: #80cbc4;
 }
 
 .line-no {

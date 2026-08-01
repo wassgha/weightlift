@@ -5,28 +5,11 @@ import { ModelManager } from "weightlift";
 import { useModel, useModelManager } from "weightlift/react";
 
 const codeTheme: PrismTheme = {
-  ...themes.vsDark,
+  ...themes.nightOwl,
   plain: {
-    color: "#d4d4d4",
+    ...themes.nightOwl.plain,
     backgroundColor: "transparent",
   },
-  styles: [
-    ...themes.vsDark.styles,
-    { types: ["comment", "prolog"], style: { color: "#6a6a6a" } },
-    { types: ["string", "attr-value"], style: { color: "#c8c8c8" } },
-    {
-      types: ["keyword", "boolean", "variable", "operator"],
-      style: { color: "#ffffff" },
-    },
-    { types: ["function", "tag"], style: { color: "#e8e8e8" } },
-    {
-      types: ["number", "constant", "builtin", "char"],
-      style: { color: "#b0b0b0" },
-    },
-    { types: ["punctuation", "plain"], style: { color: "#8a8a8a" } },
-    { types: ["class-name", "maybe-class-name"], style: { color: "#f0f0f0" } },
-    { types: ["property", "attr-name"], style: { color: "#bcbcbc" } },
-  ],
 };
 
 type Scored = { label: string; score: number };
@@ -356,9 +339,9 @@ function CodeBlock({ code }: { code: string }) {
         <span>typescript</span>
         <CopyButton value={code} />
       </div>
-      <Highlight theme={codeTheme} code={code.trimEnd()} language="tsx">
+      <Highlight theme={codeTheme} code={code.trimEnd()} language="typescript">
         {({ className, style, tokens, getLineProps, getTokenProps }) => (
-          <pre className={className} style={style}>
+          <pre className={`code-pre ${className}`} style={style}>
             <code>
               {tokens.map((line, i) => (
                 <div key={i} {...getLineProps({ line })}>
