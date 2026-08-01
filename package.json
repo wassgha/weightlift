@@ -1,6 +1,6 @@
 {
   "name": "weightlift",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "In-browser ML model registry with download progress.",
   "license": "MIT",
   "author": {
