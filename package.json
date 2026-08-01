@@ -62,6 +62,8 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "tsx --test tests/**/*-test.ts",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "demo:dev": "npm run build && npm --prefix demo run dev",
+    "demo:build": "npm run build && npm --prefix demo run build",
     "prepublishOnly": "npm run build && npm test"
   },
   "engines": {

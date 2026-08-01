@@ -1,8 +1,10 @@
 # dependencies
 node_modules/
+demo/node_modules/
 
 # build
 dist/
+demo/dist/
 *.tsbuildinfo
 
 # packs / publish artifacts

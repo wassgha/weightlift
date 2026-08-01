@@ -2,6 +2,7 @@
 # (also enforced by package.json "files").
 src/
 tests/
+demo/
 tsconfig.json
 tsconfig.build.json
 .gitignore

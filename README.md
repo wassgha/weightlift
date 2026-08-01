@@ -2,6 +2,8 @@
 
 Load and cache ML models in the browser, with download progress you can show in the UI.
 
+**[Live demo](https://wassgha.github.io/weightlift/)** · `npm install weightlift`
+
 ```bash
 npm install weightlift
 ```
@@ -158,6 +160,7 @@ const detach = attachWorker(worker, progress);
 npm install
 npm test
 npm run build
+npm run demo:dev   # local Vite demo
 ```
 
 ## License

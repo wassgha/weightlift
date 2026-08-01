@@ -1,0 +1,23 @@
+{
+  "name": "weightlift-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "weightlift": "file:.."
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5",
+    "vite": "^6.3.5"
+  }
+}
