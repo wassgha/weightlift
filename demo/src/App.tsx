@@ -1,11 +1,179 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Highlight, themes, type PrismTheme } from "prism-react-renderer";
+import type { ModelDefinition } from "weightlift";
 import { ModelManager } from "weightlift";
 import { useModel } from "weightlift/react";
 
-const MODEL_ID = "Xenova/distilbert-base-uncased-finetuned-sst-2-english";
+const codeTheme: PrismTheme = {
+  ...themes.vsDark,
+  plain: {
+    color: "#d4d4d4",
+    backgroundColor: "transparent",
+  },
+  styles: [
+    ...themes.vsDark.styles,
+    { types: ["comment", "prolog"], style: { color: "#6a6a6a" } },
+    { types: ["string", "attr-value"], style: { color: "#c8c8c8" } },
+    {
+      types: ["keyword", "boolean", "variable", "operator"],
+      style: { color: "#ffffff" },
+    },
+    { types: ["function", "tag"], style: { color: "#e8e8e8" } },
+    {
+      types: ["number", "constant", "builtin", "char"],
+      style: { color: "#b0b0b0" },
+    },
+    { types: ["punctuation", "plain"], style: { color: "#8a8a8a" } },
+    { types: ["class-name", "maybe-class-name"], style: { color: "#f0f0f0" } },
+    { types: ["property", "attr-name"], style: { color: "#bcbcbc" } },
+  ],
+};
 
-type Sentiment = { label: string; score: number };
-type Classifier = (input: string) => Promise<Sentiment[]>;
+type Scored = { label: string; score: number };
+type SentimentPipe = (
+  input: string,
+  options?: { top_k?: number | null }
+) => Promise<Scored[] | Scored[][]>;
+type ZeroShotImagePipe = (
+  image: string,
+  labels: string[]
+) => Promise<Scored[]>;
+type FillMaskPipe = (input: string) => Promise<Scored[] | Scored[][]>;
+
+type ExampleId = "sentiment" | "vision" | "fillmask" | "custom";
+
+interface Example {
+  id: ExampleId;
+  title: string;
+  blurb: string;
+  size: string;
+  code: string;
+}
+
+const SAMPLE_IMAGES = [
+  {
+    id: "tiger",
+    label: "tiger",
+    src: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/tiger.jpg",
+  },
+  {
+    id: "cats",
+    label: "cats",
+    src: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/cats.jpg",
+  },
+  {
+    id: "beach",
+    label: "beach",
+    src: "https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/beach.png",
+  },
+] as const;
+
+const EXAMPLES: Example[] = [
+  {
+    id: "sentiment",
+    title: "Sentiment analysis",
+    blurb: "DistilBERT SST-2 — is this sentence positive or negative?",
+    size: "~67 MB",
+    code: `import { pipeline } from "@huggingface/transformers";
+import { ModelManager } from "weightlift";
+import { transformersModel } from "weightlift/transformers";
+
+const models = new ModelManager({
+  models: {
+    sentiment: transformersModel({
+      pipeline,
+      task: "sentiment-analysis",
+      modelId:
+        "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+    }),
+  },
+});
+
+const clf = await models.load("sentiment");
+const out = await clf("I love transformers!", { top_k: null });`,
+  },
+  {
+    id: "vision",
+    title: "Zero-shot vision",
+    blurb: "CLIP ranks your own labels against an image.",
+    size: "~150 MB",
+    code: `import { pipeline } from "@huggingface/transformers";
+import { ModelManager } from "weightlift";
+import { transformersModel } from "weightlift/transformers";
+
+const models = new ModelManager({
+  models: {
+    vision: transformersModel({
+      pipeline,
+      task: "zero-shot-image-classification",
+      modelId: "Xenova/clip-vit-base-patch32",
+    }),
+  },
+});
+
+const clip = await models.load("vision");
+await clip(imageUrl, ["tiger", "lion", "house cat"]);`,
+  },
+  {
+    id: "fillmask",
+    title: "Fill the blank",
+    blurb: "BERT guesses the [MASK] token.",
+    size: "~110 MB",
+    code: `import { pipeline } from "@huggingface/transformers";
+import { ModelManager } from "weightlift";
+import { transformersModel } from "weightlift/transformers";
+
+const models = new ModelManager({
+  models: {
+    fillmask: transformersModel({
+      pipeline,
+      task: "fill-mask",
+      modelId: "Xenova/bert-base-uncased",
+    }),
+  },
+});
+
+const unmask = await models.load("fillmask");
+await unmask("The browser can run [MASK] models.");`,
+  },
+  {
+    id: "custom",
+    title: "Custom ModelDefinition",
+    blurb: "Any runtime — map progress events yourself.",
+    size: "demo",
+    code: `import { ModelManager } from "weightlift";
+
+const models = new ModelManager({
+  models: {
+    custom: {
+      load: async ({ progress }) => {
+        progress.dispatch({ type: "start" });
+        // …fetch / init, dispatch progress events…
+        progress.dispatch({ type: "ready" });
+        return myModel;
+      },
+    },
+  },
+});
+
+await models.load("custom");`,
+  },
+];
+
+const ASCII = `██╗    ██╗███████╗██╗ ██████╗ ██╗  ██╗████████╗██╗     ██╗███████╗████████╗
+██║    ██║██╔════╝██║██╔════╝ ██║  ██║╚══██╔══╝██║     ██║██╔════╝╚══██╔══╝
+██║ █╗ ██║█████╗  ██║██║  ███╗███████║   ██║   ██║     ██║█████╗     ██║
+██║███╗██║██╔══╝  ██║██║   ██║██╔══██║   ██║   ██║     ██║██╔══╝     ██║
+╚███╔███╔╝███████╗██║╚██████╔╝██║  ██║   ██║   ███████╗██║██║        ██║
+ ╚══╝╚══╝ ╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝╚═╝        ╚═╝`;
+
+const INSTALL = "npm install weightlift";
+
+const MODEL_IDS: Record<Exclude<ExampleId, "custom">, string> = {
+  sentiment: "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+  vision: "Xenova/clip-vit-base-patch32",
+  fillmask: "Xenova/bert-base-uncased",
+};
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -13,203 +181,571 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function createSentimentDefinition() {
-  const [{ env, pipeline }, { transformersModel }] = await Promise.all([
-    import("@huggingface/transformers"),
-    import("weightlift/transformers"),
-  ]);
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-  env.allowLocalModels = false;
-  env.useBrowserCache = true;
-  if (env.backends.onnx.wasm) {
-    env.backends.onnx.wasm.proxy = false;
+/** Flatten nested pipeline outputs and pick the highest score. */
+function topScored(raw: unknown): Scored | null {
+  const rows = flattenScored(raw);
+  if (!rows.length) return null;
+  return rows.reduce((best, row) => (row.score > best.score ? row : best));
+}
+
+function flattenScored(raw: unknown): Scored[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (Array.isArray(raw[0])) {
+    return flattenScored(raw[0]);
   }
+  return raw.filter(
+    (row): row is Scored =>
+      !!row &&
+      typeof row === "object" &&
+      typeof (row as Scored).label === "string" &&
+      typeof (row as Scored).score === "number"
+  );
+}
 
-  return transformersModel<Classifier>({
+function RankedList({ rows }: { rows: Scored[] }) {
+  const sorted = [...rows].sort((a, b) => b.score - a.score).slice(0, 5);
+  return (
+    <ul className="ranked">
+      {sorted.map((row) => (
+        <li key={row.label}>
+          <span>{row.label}</span>
+          <span className="muted">{(row.score * 100).toFixed(1)}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function customDefinition(): ModelDefinition<{ ok: true }> {
+  return {
+    isCached: () => false,
+    load: async ({ progress }) => {
+      const files = ["config.json", "tokenizer.json", "model.onnx"];
+      const totals = [4_096, 28_000, 420_000];
+      progress.dispatch({ type: "start" });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]!;
+        const total = totals[i]!;
+        progress.dispatch({ type: "initiate", file });
+        for (let loaded = 0; loaded <= total; loaded += Math.ceil(total / 12)) {
+          progress.dispatch({
+            type: "progress",
+            file,
+            loaded: Math.min(loaded, total),
+            total,
+          });
+          await sleep(40);
+        }
+        progress.dispatch({ type: "done", file });
+      }
+      progress.dispatch({ type: "ready" });
+      return { ok: true };
+    },
+  };
+}
+
+let runtimePromise: Promise<{
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transformersModel: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pipeline: any;
+}> | null = null;
+
+async function getRuntime() {
+  if (!runtimePromise) {
+    runtimePromise = Promise.all([
+      import("@huggingface/transformers"),
+      import("weightlift/transformers"),
+    ]).then(([tf, wl]) => {
+      tf.env.allowLocalModels = false;
+      tf.env.useBrowserCache = true;
+      if (tf.env.backends.onnx.wasm) {
+        tf.env.backends.onnx.wasm.proxy = false;
+      }
+      return {
+        pipeline: tf.pipeline,
+        transformersModel: wl.transformersModel,
+      };
+    });
+  }
+  return runtimePromise;
+}
+
+async function definitionFor(id: ExampleId): Promise<ModelDefinition<any>> {
+  if (id === "custom") return customDefinition();
+
+  const { pipeline, transformersModel } = await getRuntime();
+  const modelId = MODEL_IDS[id];
+
+  if (id === "sentiment") {
+    return transformersModel({
+      pipeline,
+      task: "sentiment-analysis",
+      modelId,
+    });
+  }
+  if (id === "vision") {
+    return transformersModel({
+      pipeline,
+      task: "zero-shot-image-classification",
+      modelId,
+    });
+  }
+  return transformersModel({
     pipeline,
-    task: "sentiment-analysis",
-    modelId: MODEL_ID,
-    dtype: { webgpu: "q8", wasm: "q8" },
+    task: "fill-mask",
+    modelId,
   });
 }
 
-export function App() {
-  const manager = useMemo(() => new ModelManager(), []);
-  const model = useModel<Classifier>(manager, "sentiment");
-
-  const [text, setText] = useState(
-    "Weightlifting models in the browser feels light."
+function GitHubIcon() {
+  return (
+    <svg
+      className="gh-icon"
+      viewBox="0 0 16 16"
+      width="14"
+      height="14"
+      aria-hidden="true"
+    >
+      <path
+        fill="currentColor"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+      />
+    </svg>
   );
-  const [result, setResult] = useState<Sentiment | null>(null);
-  const [running, setRunning] = useState(false);
-  const [bootstrapping, setBootstrapping] = useState(false);
+}
 
-  const busy = model.isLoading || bootstrapping;
-  const percent = model.percent != null ? Math.round(model.percent * 100) : null;
-  const statusLabel = bootstrapping
-    ? "Preparing runtime"
-    : model.isLoading
-      ? model.fromCache
-        ? "Loading from cache"
-        : "Downloading weights"
-      : model.isReady
-        ? "Ready"
-        : model.hasError
-          ? "Failed"
-          : "Idle";
+function CopyButton({ value, label = "copy" }: { value: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
 
-  async function onLoad() {
-    setResult(null);
-    setBootstrapping(true);
+  async function copy() {
     try {
-      if (!manager.has("sentiment")) {
-        manager.define("sentiment", await createSentimentDefinition());
-      }
-      setBootstrapping(false);
-      await model.load();
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
     } catch {
-      setBootstrapping(false);
+      /* ignore */
     }
   }
 
-  async function onClassify() {
-    if (!model.value) return;
-    setRunning(true);
-    setResult(null);
+  return (
+    <button type="button" className="copy-btn" onClick={copy}>
+      {copied ? "copied" : label}
+    </button>
+  );
+}
+
+function CopyCommand({ value }: { value: string }) {
+  return (
+    <div className="cmd">
+      <span className="cmd-prompt">$</span>
+      <code>{value}</code>
+      <CopyButton value={value} />
+    </div>
+  );
+}
+
+function CodeBlock({ code }: { code: string }) {
+  return (
+    <div className="code">
+      <div className="code-bar">
+        <span>typescript</span>
+        <CopyButton value={code} />
+      </div>
+      <Highlight theme={codeTheme} code={code.trimEnd()} language="tsx">
+        {({ className, style, tokens, getLineProps, getTokenProps }) => (
+          <pre className={className} style={style}>
+            <code>
+              {tokens.map((line, i) => (
+                <div key={i} {...getLineProps({ line })}>
+                  <span className="line-no">{i + 1}</span>
+                  {line.map((token, key) => (
+                    <span key={key} {...getTokenProps({ token })} />
+                  ))}
+                </div>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
+    </div>
+  );
+}
+
+function ExampleSection({
+  example,
+  manager,
+  codeFirst,
+}: {
+  example: Example;
+  manager: ModelManager;
+  codeFirst: boolean;
+}) {
+  const model = useModel(manager, example.id);
+  const [booting, setBooting] = useState(false);
+  const [text, setText] = useState(
+    example.id === "sentiment"
+      ? "I love loading models in the browser!"
+      : example.id === "fillmask"
+        ? "The browser can run [MASK] models."
+        : ""
+  );
+  const [labels, setLabels] = useState("tiger, lion, house cat, dog");
+  const [imageSrc, setImageSrc] = useState<string>(SAMPLE_IMAGES[0].src);
+  const [output, setOutput] = useState<ReactNode>(null);
+  const [running, setRunning] = useState(false);
+
+  const busy = model.isLoading || booting;
+  const percent =
+    model.percent != null ? Math.round(model.percent * 100) : null;
+
+  const status = booting
+    ? "preparing runtime"
+    : model.isLoading
+      ? model.fromCache
+        ? "loading from cache"
+        : "downloading"
+      : model.isReady
+        ? "ready"
+        : model.hasError
+          ? "error"
+          : "idle";
+
+  async function load() {
+    setOutput(null);
+    setBooting(true);
     try {
-      const out = await model.value(text);
-      setResult(out[0] ?? null);
+      if (!manager.has(example.id)) {
+        manager.define(example.id, await definitionFor(example.id));
+      }
+      setBooting(false);
+      await model.load();
+    } catch {
+      setBooting(false);
+    }
+  }
+
+  async function onPickFile(file: File | undefined) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setImageSrc(url);
+  }
+
+  async function run() {
+    setRunning(true);
+    setOutput(null);
+    try {
+      if (example.id === "sentiment") {
+        const fn = model.value as SentimentPipe;
+        const raw = await fn(text, { top_k: null });
+        const rows = flattenScored(raw);
+        const hit = topScored(rows);
+        if (!hit) throw new Error("No classification returned");
+        setOutput(
+          <div className="result-stack">
+            <p className="out">
+              <strong>{hit.label}</strong>{" "}
+              <span className="muted">{(hit.score * 100).toFixed(1)}%</span>
+            </p>
+            <RankedList rows={rows} />
+          </div>
+        );
+      } else if (example.id === "vision") {
+        const fn = model.value as ZeroShotImagePipe;
+        const labelList = labels
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const raw = await fn(imageSrc, labelList);
+        const rows = flattenScored(raw);
+        setOutput(<RankedList rows={rows} />);
+      } else if (example.id === "fillmask") {
+        const fn = model.value as FillMaskPipe;
+        const raw = await fn(text);
+        const rows = flattenScored(raw).map((row) => ({
+          ...row,
+          label: row.label.replace(/^##/, ""),
+        }));
+        setOutput(<RankedList rows={rows} />);
+      } else {
+        setOutput(
+          <p className="out">
+            <strong>ready</strong>
+            <span className="muted"> · custom loader finished</span>
+          </p>
+        );
+      }
+    } catch (err) {
+      setOutput(
+        <p className="out err">
+          {err instanceof Error ? err.message : "run failed"}
+        </p>
+      );
     } finally {
       setRunning(false);
     }
   }
 
-  return (
-    <div className="page">
-      <div className="atmosphere" aria-hidden="true" />
-      <div className="grain" aria-hidden="true" />
-
-      <header className="top">
-        <a className="gh" href="https://github.com/wassgha/weightlift">
-          GitHub
-        </a>
-      </header>
-
-      <main className="stage">
-        <p className="brand">weightlift</p>
-        <h1 className="headline">Load models. Watch the bytes land.</h1>
-        <p className="lede">
-          In-browser ML registry with download progress — try DistilBERT
-          sentiment below.
-        </p>
-
-        <div className="actions">
-          {!model.isReady ? (
+  const demo = (
+    <div className="demo-pane">
+      <div className="example-head">
+        <div>
+          <h2>{example.title}</h2>
+          <p className="blurb">{example.blurb}</p>
+        </div>
+        <div className="example-actions">
+          {model.isReady ? (
             <button
               type="button"
-              className="cta"
-              onClick={onLoad}
-              disabled={busy}
+              className="primary"
+              onClick={() => void model.unload()}
             >
-              {busy ? "Loading…" : "Load model"}
+              unload
             </button>
           ) : (
             <button
               type="button"
-              className="cta"
-              onClick={onClassify}
-              disabled={running || !text.trim()}
+              className="primary"
+              disabled={busy}
+              onClick={() => void load()}
             >
-              {running ? "Running…" : "Classify"}
-            </button>
-          )}
-          {model.isReady && (
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => void model.unload()}
-            >
-              Unload
+              {busy ? "loading…" : "load"}
             </button>
           )}
         </div>
+      </div>
 
-        <section
-          className={`meter ${busy ? "is-live" : ""} ${model.isReady ? "is-ready" : ""}`}
-          aria-live="polite"
+      <div className="meter" aria-live="polite">
+        <div className="meter-row">
+          <span className={`status status-${model.status}`}>{status}</span>
+          <span className="meter-pct">
+            {busy
+              ? percent != null
+                ? `${percent}%`
+                : "…"
+              : model.isReady
+                ? "100%"
+                : example.size}
+          </span>
+        </div>
+        <div
+          className="track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent ?? undefined}
         >
-          <div className="meter-row">
-            <span className="meter-status">{statusLabel}</span>
-            <span className="meter-pct">
-              {busy
-                ? percent != null
-                  ? `${percent}%`
-                  : "…"
-                : model.isReady
-                  ? "100%"
-                  : "0%"}
-            </span>
-          </div>
           <div
-            className="track"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent ?? undefined}
-            aria-label="Model download progress"
-          >
-            <div
-              className={`fill ${model.indeterminate && busy ? "indeterminate" : ""}`}
-              style={{
-                width: model.isReady
-                  ? "100%"
-                  : percent != null
-                    ? `${percent}%`
-                    : busy
-                      ? "30%"
-                      : "0%",
-              }}
-            />
-          </div>
-          <div className="meter-meta">
-            <span>
-              {model.loadedBytes > 0
-                ? `${formatBytes(model.loadedBytes)}${
-                    model.totalBytes != null
-                      ? ` / ${formatBytes(model.totalBytes)}`
-                      : ""
-                  }`
-                : "—"}
+            className={`fill ${model.indeterminate && busy ? "indeterminate" : ""}`}
+            style={{
+              width: model.isReady
+                ? "100%"
+                : percent != null
+                  ? `${percent}%`
+                  : busy
+                    ? "24%"
+                    : "0%",
+            }}
+          />
+        </div>
+        <div className="meter-meta">
+          <span>
+            {model.loadedBytes > 0
+              ? `${formatBytes(model.loadedBytes)}${
+                  model.totalBytes != null
+                    ? ` / ${formatBytes(model.totalBytes)}`
+                    : ""
+                }`
+              : "—"}
+          </span>
+          {model.hasError && (
+            <span className="err">
+              {model.error?.message ?? "load failed"}
             </span>
-            <span className="mono">{MODEL_ID}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="try">
+        {example.id === "sentiment" && (
+          <label className="field">
+            <span>sentence</span>
+            <textarea
+              value={text}
+              rows={2}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+        )}
+
+        {example.id === "fillmask" && (
+          <label className="field">
+            <span>sentence with [MASK]</span>
+            <textarea
+              value={text}
+              rows={2}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </label>
+        )}
+
+        {example.id === "vision" && (
+          <>
+            <div className="field">
+              <span>image</span>
+              <div className="thumbs">
+                {SAMPLE_IMAGES.map((img) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    className={`thumb ${imageSrc === img.src ? "is-active" : ""}`}
+                    onClick={() => setImageSrc(img.src)}
+                    title={img.label}
+                  >
+                    <img src={img.src} alt={img.label} />
+                  </button>
+                ))}
+              </div>
+              <label className="upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => void onPickFile(e.target.files?.[0])}
+                />
+                upload your own
+              </label>
+              <div className="preview">
+                <img src={imageSrc} alt="Selected" />
+              </div>
+            </div>
+            <label className="field">
+              <span>candidate labels</span>
+              <input
+                value={labels}
+                onChange={(e) => setLabels(e.target.value)}
+              />
+            </label>
+          </>
+        )}
+
+        {example.id === "custom" && (
+          <p className="hint">Synthetic progress — no model weights required.</p>
+        )}
+
+        <div className="try-row">
+          <button
+            type="button"
+            className="ghost"
+            disabled={!model.isReady || running}
+            onClick={() => void run()}
+          >
+            {running
+              ? "running…"
+              : !model.isReady
+                ? "load model to run"
+                : example.id === "custom"
+                  ? "confirm"
+                  : "run"}
+          </button>
+        </div>
+        {output}
+      </div>
+    </div>
+  );
+
+  const code = (
+    <div className="code-pane">
+      <CodeBlock code={example.code} />
+    </div>
+  );
+
+  return (
+    <section
+      className={`example ${codeFirst ? "code-first" : "demo-first"}`}
+      id={example.id}
+    >
+      {codeFirst ? (
+        <>
+          {code}
+          {demo}
+        </>
+      ) : (
+        <>
+          {demo}
+          {code}
+        </>
+      )}
+    </section>
+  );
+}
+
+export function App() {
+  const manager = useMemo(() => new ModelManager(), []);
+
+  return (
+    <div className="page">
+      <header className="nav">
+        <div className="nav-brand">
+          <span className="mark" aria-hidden="true" />
+          weightlift
+        </div>
+        <a
+          className="gh-link"
+          href="https://github.com/wassgha/weightlift"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <GitHubIcon />
+          GitHub
+        </a>
+      </header>
+
+      <main>
+        <section className="hero">
+          <pre className="ascii" aria-label="weightlift">
+            {ASCII}
+          </pre>
+          <p className="eyebrow">IN-BROWSER ML MODEL REGISTRY</p>
+          <div className="hero-grid">
+            <p className="lede">
+              Register how each model loads, then{" "}
+              <code>load</code> / <code>get</code> / <code>unload</code> by id
+              — with download progress you can render.
+            </p>
+            <div className="cta-block">
+              <div className="label">TRY IT NOW</div>
+              <CopyCommand value={INSTALL} />
+            </div>
           </div>
         </section>
 
-        {model.hasError && (
-          <p className="error">{model.error?.message ?? "Load failed"}</p>
-        )}
+        <section className="playground-head" id="playground">
+          <p className="eyebrow">PLAYGROUND</p>
+          <h2 className="playground-title">Load models. Watch the bytes land.</h2>
+          <p className="lede">
+            Four loaders against one <code>ModelManager</code> — transformers
+            tasks plus a plain <code>ModelDefinition</code>.
+          </p>
+        </section>
 
-        {model.isReady && (
-          <section className="try">
-            <label className="field">
-              <span>Try a sentence</span>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={3}
-              />
-            </label>
-            {result && (
-              <p className="verdict">
-                <span className="verdict-label">{result.label}</span>
-                <span className="verdict-score">
-                  {(result.score * 100).toFixed(1)}%
-                </span>
-              </p>
-            )}
-          </section>
-        )}
+        {EXAMPLES.map((example, i) => (
+          <ExampleSection
+            key={example.id}
+            example={example}
+            manager={manager}
+            codeFirst={i % 2 === 1}
+          />
+        ))}
       </main>
+
+      <footer className="footer">
+        <span>MIT</span>
+        <a href="https://github.com/wassgha/weightlift">wassgha/weightlift</a>
+      </footer>
     </div>
   );
 }

@@ -91,6 +91,12 @@ export interface TransformersCacheOptions {
    * Defaults to `".onnx"` so tokenizer-only cache entries do not count.
    */
   fileMarker?: string;
+  /**
+   * Minimum total `Content-Length` of matching OK responses to count as cached.
+   * Filters out redirect stubs and empty placeholder entries.
+   * Defaults to `1_000_000` (1 MB).
+   */
+  minBytes?: number;
 }
 
 /**
@@ -98,6 +104,8 @@ export interface TransformersCacheOptions {
  * browser cache. Useful for {@link ModelDefinition.isCached}.
  *
  * Returns `false` when Cache Storage is unavailable (SSR, private mode, etc.).
+ * Requires real OK responses with enough `Content-Length` — a bare URL match
+ * (e.g. a cached 302 to the Hub) is not enough.
  */
 export async function isTransformersModelCached(
   modelId: string,
@@ -106,12 +114,25 @@ export async function isTransformersModelCached(
   if (typeof caches === "undefined") return false;
   const cacheKey = options?.cacheKey ?? "transformers-cache";
   const fileMarker = options?.fileMarker ?? ".onnx";
+  const minBytes = options?.minBytes ?? 1_000_000;
   try {
     const cache = await caches.open(cacheKey);
     const keys = await cache.keys();
-    return keys.some(
-      (req) => req.url.includes(modelId) && req.url.includes(fileMarker)
-    );
+    let total = 0;
+    for (const req of keys) {
+      if (!req.url.includes(modelId) || !req.url.includes(fileMarker)) {
+        continue;
+      }
+      const res = await cache.match(req);
+      if (!res || !res.ok) continue;
+
+      const headerLen = Number(res.headers.get("content-length"));
+      if (!Number.isFinite(headerLen) || headerLen <= 0) continue;
+
+      total += headerLen;
+      if (total >= minBytes) return true;
+    }
+    return false;
   } catch {
     return false;
   }

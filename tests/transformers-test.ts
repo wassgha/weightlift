@@ -137,3 +137,68 @@ describe("transformersModel", () => {
     assert.equal(calls, 1);
   });
 });
+
+describe("isTransformersModelCached", () => {
+  const modelId = "Xenova/demo-model";
+
+  function mockCaches(
+    entries: Array<{ url: string; status: number; length?: number }>
+  ) {
+    const map = new Map(
+      entries.map((e) => {
+        const headers = new Headers();
+        if (e.length != null) headers.set("content-length", String(e.length));
+        return [
+          e.url,
+          new Response(null, { status: e.status, headers }),
+        ] as const;
+      })
+    );
+    const keys = [...map.keys()].map((url) => new Request(url));
+    return {
+      open: async () => ({
+        keys: async () => keys,
+        match: async (req: Request) => map.get(req.url) ?? undefined,
+      }),
+    };
+  }
+
+  it("ignores redirect stubs without weight bytes", async () => {
+    const { isTransformersModelCached } = await import(
+      "../src/transformers.js"
+    );
+    const previous = globalThis.caches;
+    // @ts-expect-error test mock
+    globalThis.caches = mockCaches([
+      {
+        url: `https://huggingface.co/${modelId}/resolve/main/onnx/model.onnx`,
+        status: 302,
+      },
+    ]);
+    try {
+      assert.equal(await isTransformersModelCached(modelId), false);
+    } finally {
+      globalThis.caches = previous;
+    }
+  });
+
+  it("returns true when enough ONNX bytes are cached", async () => {
+    const { isTransformersModelCached } = await import(
+      "../src/transformers.js"
+    );
+    const previous = globalThis.caches;
+    // @ts-expect-error test mock
+    globalThis.caches = mockCaches([
+      {
+        url: `https://huggingface.co/${modelId}/resolve/main/onnx/model.onnx`,
+        status: 200,
+        length: 5_000_000,
+      },
+    ]);
+    try {
+      assert.equal(await isTransformersModelCached(modelId), true);
+    } finally {
+      globalThis.caches = previous;
+    }
+  });
+});
