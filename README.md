@@ -40,16 +40,6 @@ await clf("I love transformers!");
 
 Same patterns as the [playground](https://weightlift.dev).
 
-### Sentiment
-
-```ts
-sentiment: transformersModel({
-  pipeline,
-  task: "sentiment-analysis",
-  modelId: "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
-}),
-```
-
 ### Zero-shot vision
 
 ```ts
@@ -61,6 +51,16 @@ vision: transformersModel({
 
 const clip = await models.load("vision");
 await clip(imageUrl, ["tiger", "lion", "house cat"]);
+```
+
+### Sentiment
+
+```ts
+sentiment: transformersModel({
+  pipeline,
+  task: "sentiment-analysis",
+  modelId: "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+}),
 ```
 
 ### Fill-mask

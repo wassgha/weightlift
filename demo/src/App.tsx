@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Highlight, themes, type PrismTheme } from "prism-react-renderer";
 import type { ModelDefinition } from "weightlift";
 import { ModelManager } from "weightlift";
-import { useModel } from "weightlift/react";
+import { useModel, useModelManager } from "weightlift/react";
 
 const codeTheme: PrismTheme = {
   ...themes.vsDark,
@@ -70,6 +70,28 @@ const SAMPLE_IMAGES = [
 
 const EXAMPLES: Example[] = [
   {
+    id: "vision",
+    title: "Zero-shot vision",
+    blurb: "CLIP ranks your own labels against an image.",
+    size: "~150 MB",
+    code: `import { pipeline } from "@huggingface/transformers";
+import { ModelManager } from "weightlift";
+import { transformersModel } from "weightlift/transformers";
+
+const models = new ModelManager({
+  models: {
+    vision: transformersModel({
+      pipeline,
+      task: "zero-shot-image-classification",
+      modelId: "Xenova/clip-vit-base-patch32",
+    }),
+  },
+});
+
+const clip = await models.load("vision");
+await clip(imageUrl, ["tiger", "lion", "house cat"]);`,
+  },
+  {
     id: "sentiment",
     title: "Sentiment analysis",
     blurb: "DistilBERT SST-2 — is this sentence positive or negative?",
@@ -91,28 +113,6 @@ const models = new ModelManager({
 
 const clf = await models.load("sentiment");
 const out = await clf("I love transformers!", { top_k: null });`,
-  },
-  {
-    id: "vision",
-    title: "Zero-shot vision",
-    blurb: "CLIP ranks your own labels against an image.",
-    size: "~150 MB",
-    code: `import { pipeline } from "@huggingface/transformers";
-import { ModelManager } from "weightlift";
-import { transformersModel } from "weightlift/transformers";
-
-const models = new ModelManager({
-  models: {
-    vision: transformersModel({
-      pipeline,
-      task: "zero-shot-image-classification",
-      modelId: "Xenova/clip-vit-base-patch32",
-    }),
-  },
-});
-
-const clip = await models.load("vision");
-await clip(imageUrl, ["tiger", "lion", "house cat"]);`,
   },
   {
     id: "fillmask",
@@ -372,6 +372,89 @@ function CodeBlock({ code }: { code: string }) {
           </pre>
         )}
       </Highlight>
+    </div>
+  );
+}
+
+function modelRowLabel(
+  status: string,
+  fromCache: boolean | null
+): { text: string; tone: string } {
+  if (status === "loading") {
+    return {
+      text: fromCache ? "loading · cache" : "loading · download",
+      tone: "loading",
+    };
+  }
+  if (status === "ready") {
+    return {
+      text: fromCache ? "ready · cached" : "ready",
+      tone: "ready",
+    };
+  }
+  if (status === "error") {
+    return { text: "error", tone: "error" };
+  }
+  return { text: "idle", tone: "idle" };
+}
+
+function PlaygroundStatus({ manager }: { manager: ModelManager }) {
+  const snapshot = useModelManager(manager);
+
+  return (
+    <div className="status-board" aria-live="polite">
+      <div className="status-board-head">
+        <span>Model</span>
+        <span>State</span>
+        <span>Progress</span>
+      </div>
+      <ul className="status-board-list">
+        {EXAMPLES.map((example) => {
+          const rec = snapshot.models[example.id];
+          const status = rec?.status ?? "idle";
+          const fromCache = rec?.fromCache ?? null;
+          const { text, tone } = modelRowLabel(status, fromCache);
+          const percent =
+            rec?.percent != null ? Math.round(rec.percent * 100) : null;
+          const progress =
+            status === "ready"
+              ? "100%"
+              : status === "loading"
+                ? percent != null
+                  ? `${percent}%`
+                  : "…"
+                : status === "error"
+                  ? "—"
+                  : example.size;
+
+          return (
+            <li key={example.id} className={`status-row tone-${tone}`}>
+              <a className="status-id" href={`#${example.id}`}>
+                {example.id}
+              </a>
+              <span className="status-state">{text}</span>
+              <span className="status-progress">
+                <span className="status-track" aria-hidden="true">
+                  <span
+                    className="status-fill"
+                    style={{
+                      width:
+                        status === "ready"
+                          ? "100%"
+                          : percent != null
+                            ? `${percent}%`
+                            : status === "loading"
+                              ? "20%"
+                              : "0%",
+                    }}
+                  />
+                </span>
+                <span className="status-pct">{progress}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -728,6 +811,7 @@ export function App() {
             Manage multiple models with one <code>ModelManager</code> — support for transformers.js
             and custom model loaders via <code>ModelDefinition</code>.
           </p>
+          <PlaygroundStatus manager={manager} />
         </section>
 
         {EXAMPLES.map((example, i) => (
