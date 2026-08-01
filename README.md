@@ -1,10 +1,17 @@
 # weightlift
 
-In-browser AI/ML multi-model manager with download progress.
+In-browser model manager for local / on-device AI. Download progress, cache
+detection, concurrent-load deduping, React hooks, worker bridge — so you can
+ship Whisper, CLIP, etc. without wiring all that yourself.
+
+Works with Transformers.js out of the box; any custom loader is fine too.
 
 [**Try the playground →**](https://weightlift.dev)
 
 [![weightlift playground](./assets/demo.png)](https://weightlift.dev)
+
+Powers [**rescript**](https://github.com/wassgha/rescript) — a transcript-based
+video editor that runs Whisper fully on-device in the browser.
 
 ## Install
 
