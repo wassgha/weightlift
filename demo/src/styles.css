@@ -239,15 +239,16 @@ textarea {
   background: var(--panel);
   font-family: var(--mono);
   font-size: 0.78rem;
+  overflow: hidden;
 }
 
 .status-board-head,
 .status-row {
   display: grid;
   grid-template-columns:
-    minmax(5.5rem, 1fr)
-    minmax(7.5rem, 1.2fr)
-    minmax(7rem, 1.4fr)
+    minmax(0, 1fr)
+    minmax(0, 1.2fr)
+    minmax(0, 1.4fr)
     auto;
   gap: 0.75rem;
   align-items: center;
@@ -344,6 +345,7 @@ textarea {
   font-size: 0.72rem;
   cursor: pointer;
   justify-self: end;
+  white-space: nowrap;
 }
 
 .status-try:hover {
@@ -505,7 +507,8 @@ textarea {
   background: var(--panel);
   outline: none;
   font-family: var(--mono);
-  font-size: 0.84rem;
+  /* ≥16px avoids iOS focus zoom */
+  font-size: 16px;
   resize: vertical;
 }
 
@@ -710,6 +713,37 @@ textarea {
 
   .ascii {
     font-size: 4.5px;
+  }
+
+  .status-board-head {
+    display: none;
+  }
+
+  .status-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "id try"
+      "state try"
+      "progress progress";
+    gap: 0.45rem 0.75rem;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .status-id {
+    grid-area: id;
+  }
+
+  .status-state {
+    grid-area: state;
+  }
+
+  .status-progress {
+    grid-area: progress;
+  }
+
+  .status-try {
+    grid-area: try;
+    align-self: start;
   }
 }
 
