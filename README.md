@@ -1,16 +1,16 @@
 # weightlift
 
-Load and cache ML models in the browser, with download progress you can show in the UI.
+In-browser ML model registry with download progress.
 
-**[Live demo](https://weightlift.dev)** · `npm install weightlift`
+[**Try the playground →**](https://weightlift.dev)
+
+## Install
 
 ```bash
 npm install weightlift
 ```
 
-## Quick start
-
-### Transformers.js
+## Load a model
 
 ```ts
 import { pipeline } from "@huggingface/transformers";
@@ -19,70 +19,128 @@ import { transformersModel } from "weightlift/transformers";
 
 const models = new ModelManager({
   models: {
-    siglip: transformersModel({
+    sentiment: transformersModel({
       pipeline,
-      task: "zero-shot-image-classification",
-      modelId: "Xenova/clip-vit-base-patch16",
-      dtype: { webgpu: "fp16", wasm: "fp32" },
+      task: "sentiment-analysis",
+      modelId: "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
     }),
   },
 });
 
-const clip = await models.load("siglip");
+const clf = await models.load("sentiment");
+await clf("I love transformers!");
+// [{ label: "POSITIVE", score: 0.999… }]
 ```
 
-`transformersModel` picks WebGPU when available (falls back to WASM), wires progress callbacks, and detects cache hits. After a GPU device loss:
+`transformersModel` picks WebGPU when available (falls back to WASM), wires progress, and detects cache hits.
+
+## Examples
+
+Same patterns as the [playground](https://weightlift.dev).
+
+### Sentiment
 
 ```ts
-import { fallbackDevicePolicy } from "weightlift/transformers";
+sentiment: transformersModel({
+  pipeline,
+  task: "sentiment-analysis",
+  modelId: "Xenova/distilbert-base-uncased-finetuned-sst-2-english",
+}),
+```
 
-fallbackDevicePolicy.preferWasm();
-await models.unloadAll();
+### Zero-shot vision
+
+```ts
+vision: transformersModel({
+  pipeline,
+  task: "zero-shot-image-classification",
+  modelId: "Xenova/clip-vit-base-patch32",
+}),
+
+const clip = await models.load("vision");
+await clip(imageUrl, ["tiger", "lion", "house cat"]);
+```
+
+### Fill-mask
+
+```ts
+fillmask: transformersModel({
+  pipeline,
+  task: "fill-mask",
+  modelId: "Xenova/bert-base-uncased",
+}),
+
+const unmask = await models.load("fillmask");
+await unmask("The browser can run [MASK] models.");
 ```
 
 ### Any other runtime
 
-Register a `ModelDefinition` that loads your model and reports progress:
+```ts
+custom: {
+  load: async ({ progress }) => {
+    progress.dispatch({ type: "start" });
+    // …fetch / init, dispatch progress events…
+    progress.dispatch({ type: "ready" });
+    return myModel;
+  },
+  dispose: (model) => model.destroy?.(),
+},
+```
+
+## Show progress
 
 ```ts
-const models = new ModelManager({
-  models: {
-    whisper: {
-      load: async ({ progress }) => {
-        progress.dispatch({ type: "start" });
-        // …fetch / init your model, dispatch progress events…
-        progress.dispatch({ type: "ready" });
-        return myModel;
-      },
-      isCached: () => /* optional */,
-      dispose: (model) => model.destroy?.(),
-    },
-  },
-});
+const { status, percent, fromCache } = models.status("sentiment");
 
-const whisper = await models.load("whisper");
+const label =
+  status === "loading"
+    ? fromCache
+      ? "Loading from cache…"
+      : `Downloading… ${Math.round((percent ?? 0) * 100)}%`
+    : "";
+```
+
+### React
+
+```tsx
+import { useModel } from "weightlift/react";
+
+function LoadButton({ manager }: { manager: ModelManager }) {
+  const { percent, fromCache, isLoading, load } = useModel(manager, "sentiment");
+
+  return (
+    <button onClick={() => load()} disabled={isLoading}>
+      {isLoading
+        ? fromCache
+          ? "Loading from cache…"
+          : `Downloading… ${Math.round((percent ?? 0) * 100)}%`
+        : "Load model"}
+    </button>
+  );
+}
 ```
 
 ## Packages
 
-| Import | Exports |
+| Import | What |
 | --- | --- |
 | `weightlift` | `ModelManager`, `Weightlift` |
 | `weightlift/react` | `useModel`, `useModelManager`, … |
 | `weightlift/worker` | `createWorkerReporter`, `attachWorker` |
 | `weightlift/transformers` | `transformersModel`, `fallbackDevicePolicy`, … |
 
-React is an optional peer dependency. `@huggingface/transformers` is not a dependency — pass `pipeline` in yourself.
+React is an optional peer. `@huggingface/transformers` is not a dependency — pass `pipeline` yourself.
 
-## ModelManager
+## API
 
 ```ts
 const models = new ModelManager({ models: { /* … */ } });
 
-await models.load("siglip");   // dedupes concurrent callers
-models.get("siglip");          // sync access once ready
-models.status("siglip");       // { status, percent, fromCache, … }
-await models.unload("siglip");
+await models.load("sentiment");   // dedupes concurrent callers
+models.get("sentiment");          // sync access once ready
+models.status("sentiment");       // { status, percent, fromCache, … }
+await models.unload("sentiment");
 await models.preload(["a", "b"]);
 ```
 
@@ -99,59 +157,28 @@ await models.preload(["a", "b"]);
 | `preload([ids])` | Warm several models |
 | `subscribe` / `getSnapshot` | Subscribe to manager-wide state |
 
-### Progress in the UI
+### GPU fallback
 
 ```ts
-const { status, fromCache, percent } = models.status("siglip");
+import { fallbackDevicePolicy } from "weightlift/transformers";
 
-const label =
-  status === "loading"
-    ? fromCache
-      ? "Loading from cache…"
-      : "Downloading…"
-    : "";
+fallbackDevicePolicy.preferWasm();
+await models.unloadAll();
 ```
 
-## React
-
-```tsx
-import { useModel } from "weightlift/react";
-
-function ProgressBar({ manager }: { manager: ModelManager }) {
-  const { percent, fromCache, isLoading, load } = useModel(manager, "siglip");
-
-  return (
-    <button onClick={() => load()} disabled={isLoading}>
-      {isLoading
-        ? fromCache
-          ? "Loading from cache…"
-          : `Downloading… ${Math.round((percent ?? 0) * 100)}%`
-        : "Load model"}
-    </button>
-  );
-}
-```
-
-`useModelManager(manager)` subscribes to the full snapshot. `useModelManagerStore(options)` creates a manager that lives for the component’s lifetime.
-
-## Workers
-
-Load models off the main thread and mirror progress back:
+### Workers
 
 ```ts
-// worker.ts
+// worker
 import { Weightlift } from "weightlift";
 import { createWorkerReporter } from "weightlift/worker";
 
 const progress = new Weightlift();
-const reporter = createWorkerReporter(self, progress);
+createWorkerReporter(self, progress);
 
-// main thread
-import { Weightlift } from "weightlift";
+// main
 import { attachWorker } from "weightlift/worker";
-
-const progress = new Weightlift();
-const detach = attachWorker(worker, progress);
+attachWorker(worker, progress);
 ```
 
 ## Develop
@@ -160,7 +187,7 @@ const detach = attachWorker(worker, progress);
 npm install
 npm test
 npm run build
-npm run demo:dev   # local Vite demo
+npm run demo:dev
 ```
 
 ## License

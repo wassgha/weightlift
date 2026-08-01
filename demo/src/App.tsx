@@ -709,12 +709,10 @@ export function App() {
           <pre className="ascii" aria-label="weightlift">
             {ASCII}
           </pre>
-          <p className="eyebrow">IN-BROWSER ML MODEL REGISTRY</p>
+          <p className="eyebrow">IN-BROWSER AI MODEL MANAGER</p>
           <div className="hero-grid">
             <p className="lede">
-              Register how each model loads, then{" "}
-              <code>load</code> / <code>get</code> / <code>unload</code> by id
-              — with download progress you can render.
+              Load, cache and manage client-side AI models with live progress tracking.
             </p>
             <div className="cta-block">
               <div className="label">TRY IT NOW</div>
