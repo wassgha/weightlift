@@ -401,12 +401,20 @@ function modelRowLabel(
 function PlaygroundStatus({ manager }: { manager: ModelManager }) {
   const snapshot = useModelManager(manager);
 
+  function scrollToExample(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   return (
     <div className="status-board" aria-live="polite">
       <div className="status-board-head">
         <span>Model</span>
         <span>State</span>
         <span>Progress</span>
+        <span></span>
       </div>
       <ul className="status-board-list">
         {EXAMPLES.map((example) => {
@@ -451,6 +459,13 @@ function PlaygroundStatus({ manager }: { manager: ModelManager }) {
                 </span>
                 <span className="status-pct">{progress}</span>
               </span>
+              <button
+                type="button"
+                className="status-try"
+                onClick={() => scrollToExample(example.id)}
+              >
+                try
+              </button>
             </li>
           );
         })}
