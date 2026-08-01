@@ -2,7 +2,7 @@
 
 Load and cache ML models in the browser, with download progress you can show in the UI.
 
-**[Live demo](https://wassgha.github.io/weightlift/)** · `npm install weightlift`
+**[Live demo](https://weightlift.dev)** · `npm install weightlift`
 
 ```bash
 npm install weightlift
