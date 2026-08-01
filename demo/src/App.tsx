@@ -725,8 +725,8 @@ export function App() {
           <p className="eyebrow">PLAYGROUND</p>
           <h2 className="playground-title">Load models. Watch the bytes land.</h2>
           <p className="lede">
-            Four loaders against one <code>ModelManager</code> — transformers
-            tasks plus a plain <code>ModelDefinition</code>.
+            Manage multiple models with one <code>ModelManager</code> — support for transformers.js
+            and custom model loaders via <code>ModelDefinition</code>.
           </p>
         </section>
 
