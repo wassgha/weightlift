@@ -165,6 +165,82 @@ describe("ModelManager", () => {
     assert.equal(await models.load("x"), 2);
   });
 
+  it("unload during an in-flight load keeps the manager idle", async () => {
+    const gate = deferred<void>();
+    let disposed: string | null = null;
+    const models = new ModelManager({
+      models: {
+        x: {
+          load: async ({ progress }) => {
+            progress.dispatch({
+              type: "progress_total",
+              loaded: 50,
+              total: 100,
+            });
+            await gate.promise;
+            progress.dispatch({
+              type: "progress_total",
+              loaded: 100,
+              total: 100,
+            });
+            return "model";
+          },
+          dispose: async (value) => {
+            disposed = value;
+          },
+        },
+      },
+    });
+
+    const pending = models.load("x");
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(models.status("x").status, "loading");
+
+    await models.unload("x");
+    assert.equal(models.status("x").status, "idle");
+    assert.equal(models.get("x"), undefined);
+
+    gate.resolve();
+    await assert.rejects(pending, /unloaded while loading/);
+    assert.equal(disposed, "model");
+    assert.equal(models.status("x").status, "idle");
+    assert.equal(models.get("x"), undefined);
+    assert.equal(models.isReady("x"), false);
+  });
+
+  it("unload during load does not poison a subsequent load", async () => {
+    const gate1 = deferred<void>();
+    const gate2 = deferred<void>();
+    let phase: "first" | "second" = "first";
+    const models = new ModelManager({
+      models: {
+        x: {
+          load: async () => {
+            if (phase === "first") {
+              await gate1.promise;
+              return "first";
+            }
+            await gate2.promise;
+            return "second";
+          },
+        },
+      },
+    });
+
+    const first = models.load("x");
+    await Promise.resolve();
+    await models.unload("x");
+    phase = "second";
+    const second = models.load("x");
+    gate1.resolve();
+    await assert.rejects(first, /unloaded while loading/);
+    gate2.resolve();
+    assert.equal(await second, "second");
+    assert.equal(models.get("x"), "second");
+    assert.equal(models.status("x").status, "ready");
+  });
+
   it("unloadAll drops every cached instance", async () => {
     const models = new ModelManager({
       models: {

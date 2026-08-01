@@ -10,8 +10,12 @@ Works with Transformers.js out of the box; any custom loader is fine too.
 
 [![weightlift playground](./assets/demo.png)](https://weightlift.dev)
 
-Powers [**rescript**](https://github.com/wassgha/rescript) — a transcript-based
+## Featured projects that use weightlift
+
+[**rescript**](https://github.com/wassgha/rescript) — a transcript-based
 video editor that runs Whisper fully on-device in the browser.
+
+[![rescript](./assets/rescript-2.png)](https://github.com/wassgha/rescript)
 
 ## Install
 

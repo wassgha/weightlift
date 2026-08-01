@@ -78,6 +78,11 @@ interface Entry<T = unknown> {
   promise: Promise<T> | null;
   value: T | undefined;
   unsubProgress: Unsubscribe;
+  /**
+   * Bumped when a load attempt is invalidated (e.g. {@link ModelManager.unload}).
+   * In-flight `#runLoad` compares against its captured epoch before committing.
+   */
+  loadEpoch: number;
 }
 
 function recordFrom(entry: Entry): ModelRecord {
@@ -191,6 +196,7 @@ export class ModelManager {
       promise: null,
       value: undefined,
       unsubProgress: progress.subscribe(() => this.#emit()),
+      loadEpoch: 0,
     };
     this.#entries.set(id, entry as Entry);
     this.#emit();
@@ -244,6 +250,7 @@ export class ModelManager {
 
   async #runLoad<T>(entry: Entry<T>): Promise<T> {
     const { definition, progress, id } = entry;
+    const epoch = entry.loadEpoch;
     progress.reset();
     entry.fromCache = null;
 
@@ -255,6 +262,11 @@ export class ModelManager {
         fromCache = null;
       }
     }
+    if (entry.loadEpoch !== epoch) {
+      throw new Error(
+        `weightlift: model "${id}" was unloaded while loading`
+      );
+    }
     entry.fromCache = fromCache;
     progress.start();
     this.#emit();
@@ -265,11 +277,21 @@ export class ModelManager {
         progress,
         fromCache,
       });
+      if (entry.loadEpoch !== epoch) {
+        await this.#disposeValue(definition, value);
+        throw new Error(
+          `weightlift: model "${id}" was unloaded while loading`
+        );
+      }
       entry.value = value;
       progress.ready();
       this.#emit();
       return value;
     } catch (err) {
+      if (entry.loadEpoch !== epoch) {
+        // unload() already reset / replaced this entry's public state.
+        throw err;
+      }
       entry.promise = null;
       entry.value = undefined;
       progress.fail(err);
@@ -312,15 +334,25 @@ export class ModelManager {
   /**
    * Drop a cached instance (and call `dispose` if provided) so the next
    * `load()` runs the definition again. Keeps the model in the registry.
+   *
+   * Safe during an in-flight `load()`: the pending promise rejects once the
+   * loader settles, any produced value is disposed, and the manager stays idle
+   * (or tracks a newer load). Progress events from the cancelled attempt are
+   * orphaned so they cannot revive the entry.
    */
   async unload(id: string): Promise<void> {
     const entry = this.#entries.get(id);
     if (!entry) return;
+    entry.loadEpoch += 1;
     await this.#disposeEntry(entry);
     entry.promise = null;
     entry.value = undefined;
     entry.fromCache = null;
-    entry.progress.reset();
+    // Replace the progress store so an in-flight loader's dispatches cannot
+    // flip this entry back to loading/ready after unload.
+    entry.unsubProgress();
+    entry.progress = new Weightlift();
+    entry.unsubProgress = entry.progress.subscribe(() => this.#emit());
     this.#emit();
   }
 
@@ -335,6 +367,8 @@ export class ModelManager {
     for (const id of ids) {
       const entry = this.#entries.get(id);
       if (!entry) continue;
+      entry.loadEpoch += 1;
+      entry.promise = null;
       entry.unsubProgress();
       await this.#disposeEntry(entry);
     }
@@ -359,12 +393,20 @@ export class ModelManager {
   };
 
   async #disposeEntry(entry: Entry): Promise<void> {
-    if (entry.value !== undefined && entry.definition.dispose) {
-      try {
-        await entry.definition.dispose(entry.value);
-      } catch {
-        // dispose errors should not block unload
-      }
+    if (entry.value !== undefined) {
+      await this.#disposeValue(entry.definition, entry.value);
+    }
+  }
+
+  async #disposeValue<T>(
+    definition: ModelDefinition<T>,
+    value: T
+  ): Promise<void> {
+    if (!definition.dispose) return;
+    try {
+      await definition.dispose(value);
+    } catch {
+      // dispose errors should not block unload
     }
   }
 
