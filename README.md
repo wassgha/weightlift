@@ -10,7 +10,11 @@ Works with Transformers.js out of the box; any custom loader is fine too.
 
 [![weightlift playground](./assets/demo.png)](https://weightlift.dev)
 
-## Featured projects that use weightlift
+## Featured Projects
+
+These projects use `weightlift` to power their on-device AI experiences:
+
+### 1. Rescript – Video Editor
 
 [**rescript**](https://github.com/wassgha/rescript) — a transcript-based
 video editor that runs Whisper fully on-device in the browser.
